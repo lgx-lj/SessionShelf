@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn clean *)",
+      "Bash(java *)",
+      "Bash(cmd *)",
+      "Bash(export JAVA_HOME=\"/c/Users/LiGuoXian/.jdks/ms-17.0.16\")",
+      "Bash(mvn javafx:run)",
+      "Bash(export JAVA_HOME=\"C:/Users/LiGuoXian/.jdks/ms-17.0.16\")",
+      "Bash(C:/Users/LiGuoXian/.jdks/ms-17.0.16/bin/java --version)",
+      "Bash(sleep 8)",
+      "Bash(echo \"应用启动完成\")",
+      "Bash(powershell *)",
+      "WebSearch",
+      "Bash(ls -lh target/session-shelf-1.0.0.jar)",
+      "Bash(C:/Users/LiGuoXian/.jdks/ms-17.0.16/bin/javaw.exe --add-opens javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED --add-opens javafx.base/com.sun.javafx.binding=ALL-UNNAMED --add-opens javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED --add-opens javafx.controls/com.sun.javafx.scene.control=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar target/session-shelf-1.0.0.jar)",
+      "Bash(sleep 3)",
+      "Bash(echo \"应用已启动（后台运行）\")",
+      "Bash(mvn package *)",
+      "Bash(echo \"打包完成\")",
+      "Bash(taskkill //F //IM javaw.exe)",
+      "Bash(taskkill //F //IM java.exe)",
+      "Bash(sleep 1)",
+      "Bash(echo \"应用已启动\")",
+      "Bash(echo \"编译成功\")",
+      "Bash(C:/Users/LiGuoXian/.jdks/ms-17.0.16/bin/javaw.exe --add-opens javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED --add-opens javafx.base/com.sun.javafx.binding=ALL-UNNAMED --add-opens javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED --add-opens javafx.controls/com.sun.javafx.scene.control=ALL-UNNAMED --add-opens javafx.web/com.sun.javafx.scene.web=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar target/session-shelf-1.0.0.jar)",
+      "Bash(echo \"打包成功\")",
+      "Bash(C:/Users/LiGuoXian/.jdks/ms-17.0.16/bin/javaw.exe --add-opens javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED --add-opens javafx.base/com.sun.javafx.binding=ALL-UNNAMED --add-opens javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED --add-opens javafx.controls/com.sun.javafx.scene.control=ALL-UNNAMED --add-opens javafx.web/com.sun.javafx.scene.web=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar D:/SoftwareCoding/workspace/LGX/ai/SessionShelf/target/session-shelf-1.0.0.jar)",
+      "Bash(echo \"启动完成\")",
+      "Bash(export TEMP=/tmp)",
+      "Bash(export TMP=/tmp)",
+      "Bash(export TMPDIR=/tmp)",
+      "Bash(cd \"D:/SoftwareCoding/workspace/LGX/ai/SessionShelf\")",
+      "Bash(mvn compile *)",
+      "Bash(tasklist)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(sorted\\(d.keys\\(\\)\\)\\)\")",
+      "Bash(grep -o '\"cwd\":\"[^\"]*\"' \"C:/Users/LiGuoXian/.claude/projects/D--SoftwareCoding-workspace-LGX-ai-SessionShelf/1c524463-799b-4284-9e77-c6b302987995.jsonl\")",
+      "Bash(head -1)",
+      "Bash(echo \"---\")",
+      "Bash(grep -m1 '\"cwd\"' \"C:/Users/LiGuoXian/.claude/projects/D--SoftwareCoding-workspace-LGX-LIVEService/\"*.jsonl)"
+    ]
+  }
+}

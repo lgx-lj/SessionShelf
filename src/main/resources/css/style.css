@@ -1,0 +1,307 @@
+/* Sessionshelf - 全局样式 */
+
+/* 主容器 */
+.main-container {
+    -fx-background-color: #f5f5f5;
+}
+
+/* 左侧面板 */
+.left-panel {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 1 0 0;
+}
+
+/* 中间面板 */
+.center-panel {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 1 0 0;
+}
+
+/* 右侧面板 */
+.right-panel {
+    -fx-background-color: #ffffff;
+}
+
+/* 区域标题 */
+.section-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+    -fx-padding: 5 0 5 0;
+}
+
+/* 搜索框 */
+.text-field {
+    -fx-prompt-text-fill: #999999;
+    -fx-font-size: 12px;
+    -fx-padding: 5;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-border-color: #cccccc;
+}
+
+.text-field:focused {
+    -fx-border-color: #4a90d9;
+}
+
+/* 按钮样式 */
+.search-button, .add-button, .action-button {
+    -fx-background-color: #4a90d9;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-padding: 5 15;
+    -fx-background-radius: 3;
+    -fx-cursor: hand;
+}
+
+.search-button:hover, .add-button:hover, .action-button:hover {
+    -fx-background-color: #357abd;
+}
+
+.search-button:pressed, .add-button:pressed, .action-button:pressed {
+    -fx-background-color: #2a6099;
+}
+
+/* 紧凑操作按钮（详情区右上角） */
+.compact-action-button {
+    -fx-background-color: #e8e8e8;
+    -fx-text-fill: #555;
+    -fx-font-size: 11px;
+    -fx-padding: 3 10;
+    -fx-background-radius: 3;
+    -fx-cursor: hand;
+}
+
+.compact-action-button:hover {
+    -fx-background-color: #4a90d9;
+    -fx-text-fill: white;
+}
+
+.compact-action-button:pressed {
+    -fx-background-color: #357abd;
+    -fx-text-fill: white;
+}
+
+/* 文件夹树 */
+.folder-tree {
+    -fx-font-size: 13px;
+}
+
+.folder-tree .tree-cell {
+    -fx-padding: 4 8;
+    -fx-background-color: transparent;
+}
+
+.folder-tree .tree-cell:selected {
+    -fx-background-color: #e3f2fd;
+    -fx-text-fill: #1976d2;
+}
+
+.folder-tree .tree-cell:hover {
+    -fx-background-color: #f5f5f5;
+}
+
+/* 标签列表 */
+.tag-list {
+    -fx-font-size: 12px;
+}
+
+.tag-list .list-cell {
+    -fx-padding: 4 8;
+    -fx-background-color: transparent;
+}
+
+.tag-list .list-cell:selected {
+    -fx-background-color: #e3f2fd;
+    -fx-text-fill: #1976d2;
+}
+
+.tag-list .list-cell:hover {
+    -fx-background-color: #f5f5f5;
+}
+
+/* 会话列表 */
+.session-list {
+    -fx-font-size: 13px;
+}
+
+.session-list .list-cell {
+    -fx-padding: 10;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent #f0f0f0 transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.session-list .list-cell:selected {
+    -fx-background-color: #e3f2fd;
+    -fx-text-fill: #1976d2;
+}
+
+.session-list .list-cell:hover {
+    -fx-background-color: #f5f5f5;
+}
+
+/* 会话标题 */
+.session-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+}
+
+/* 内容滚动区域 */
+.content-scroll {
+    -fx-background-color: #fafafa;
+    -fx-border-color: #e0e0e0;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+}
+
+.content-box {
+    -fx-background-color: transparent;
+}
+
+/* 对话气泡样式 */
+.message-bubble {
+    -fx-padding: 10 15;
+    -fx-background-radius: 10;
+    -fx-max-width: 80%;
+}
+
+.user-message {
+    -fx-background-color: #e3f2fd;
+    -fx-alignment: center-right;
+}
+
+.ai-message {
+    -fx-background-color: #f5f5f5;
+    -fx-alignment: center-left;
+}
+
+.message-role {
+    -fx-font-size: 11px;
+    -fx-text-fill: #999999;
+    -fx-font-weight: bold;
+}
+
+.message-content {
+    -fx-font-size: 13px;
+    -fx-text-fill: #333333;
+    -fx-wrap-text: true;
+}
+
+/* 代码块样式 */
+.code-block {
+    -fx-background-color: #263238;
+    -fx-text-fill: #eeffff;
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 12px;
+    -fx-padding: 10;
+    -fx-background-radius: 5;
+}
+
+/* 状态栏 */
+.status-bar {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 1 0 0 0;
+    -fx-font-size: 11px;
+    -fx-text-fill: #666666;
+}
+
+/* 下拉框 */
+.combo-box {
+    -fx-font-size: 12px;
+}
+
+/* 分隔线 */
+.separator {
+    -fx-padding: 5 0;
+}
+
+/* 滚动条样式 */
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #cccccc;
+    -fx-background-radius: 3;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #999999;
+}
+
+.scroll-bar .increment-button, .scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.scroll-bar .increment-arrow, .scroll-bar .decrement-arrow {
+    -fx-shape: " ";
+    -fx-padding: 0;
+}
+
+/* 右键菜单 */
+.context-menu {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #cccccc;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 3);
+}
+
+.menu-item {
+    -fx-padding: 5 20;
+}
+
+.menu-item:focused {
+    -fx-background-color: #e3f2fd;
+}
+
+.menu-item .label {
+    -fx-font-size: 12px;
+}
+
+/* 收起/展开按钮 */
+.toggle-button {
+    -fx-background-color: #e0e0e0;
+    -fx-text-fill: #555;
+    -fx-font-size: 11px;
+    -fx-padding: 3;
+    -fx-background-radius: 3;
+    -fx-cursor: hand;
+    -fx-min-width: 28;
+    -fx-max-width: 28;
+    -fx-min-height: 28;
+    -fx-max-height: 28;
+}
+
+.toggle-button:hover {
+    -fx-background-color: #bdbdbd;
+}
+
+.toggle-button:pressed {
+    -fx-background-color: #9e9e9e;
+}
+
+/* SplitPane 分割线 - 清晰的可拖动分隔条 */
+.split-pane {
+    -fx-padding: 0;
+}
+
+.split-pane-divider {
+    -fx-padding: 0 3 0 3;
+    -fx-background-color: #d0d0d0;
+    -fx-cursor: h-resize;
+}
+
+.split-pane-divider:hover {
+    -fx-background-color: #90caf9;
+}
+
+.split-pane:vertical > .split-pane-divider {
+    -fx-cursor: v-resize;
+}

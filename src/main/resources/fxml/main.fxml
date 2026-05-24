@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.web.WebView?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml" fx:id="rootPane"
+            fx:controller="com.sessionshelf.controller.MainController"
+            prefWidth="1200" prefHeight="800" styleClass="main-container">
+
+    <!-- 顶部菜单栏 -->
+    <top>
+        <MenuBar>
+            <menus>
+                <Menu text="文件">
+                    <items>
+                        <MenuItem text="刷新同步" onAction="#onRefreshSync" />
+                        <MenuItem text="扫描路径设置" onAction="#onPathSettings" />
+                        <SeparatorMenuItem />
+                        <MenuItem text="退出" onAction="#onExit" />
+                    </items>
+                </Menu>
+                <Menu text="设置">
+                    <items>
+                        <MenuItem text="亮色主题" onAction="#onLightTheme" />
+                        <MenuItem text="深色主题" onAction="#onDarkTheme" />
+                    </items>
+                </Menu>
+                <Menu text="帮助">
+                    <items>
+                        <MenuItem text="关于" onAction="#onAbout" />
+                    </items>
+                </Menu>
+            </menus>
+        </MenuBar>
+    </top>
+
+    <!-- 左侧面板容器（SplitPane由控制器代码构建） -->
+    <center>
+        <VBox fx:id="leftPanel" spacing="8" styleClass="left-panel" minWidth="200" prefWidth="260">
+            <padding>
+                <Insets top="8" right="8" bottom="8" left="8" />
+            </padding>
+
+            <!-- 搜索栏 -->
+            <HBox spacing="4" alignment="CENTER_LEFT">
+                <TextField fx:id="searchField" promptText="搜索会话内容..." HBox.hgrow="ALWAYS" style="-fx-font-size:12px;" />
+                <Button fx:id="caseSensitiveBtn" text="Aa" onAction="#onToggleCaseSensitive"
+                        prefWidth="32" prefHeight="28" styleClass="toggle-button" />
+                <Button text="搜索" onAction="#onSearch" styleClass="search-button" prefWidth="55" />
+            </HBox>
+
+            <!-- 目录树 -->
+            <Label text="会话目录" styleClass="section-title" />
+            <TreeView fx:id="folderTree" VBox.vgrow="ALWAYS" styleClass="folder-tree" />
+        </VBox>
+    </center>
+
+    <!-- 中间面板容器（会话列表） -->
+    <VBox fx:id="centerPanel" spacing="8" styleClass="center-panel">
+        <padding>
+            <Insets top="8" right="8" bottom="8" left="8" />
+        </padding>
+
+        <!-- 筛选工具栏 -->
+        <HBox spacing="8" alignment="CENTER_LEFT">
+            <Button fx:id="toggleSidebarBtn" text="◀" onAction="#onToggleSidebar"
+                    prefWidth="28" prefHeight="28" styleClass="toggle-button" />
+            <Label text="来源:" />
+            <ComboBox fx:id="sourceFilter" prefWidth="110" />
+            <Label text="排序:" />
+            <ComboBox fx:id="sortOrder" prefWidth="90" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Label fx:id="sessionCount" text="共 0 条" />
+        </HBox>
+
+        <!-- 会话列表 -->
+        <ListView fx:id="sessionList" VBox.vgrow="ALWAYS" styleClass="session-list" />
+    </VBox>
+
+    <!-- 右侧面板容器（会话详情） -->
+    <VBox fx:id="rightPanel" spacing="8" styleClass="right-panel" prefWidth="450">
+        <padding>
+            <Insets top="8" right="8" bottom="8" left="8" />
+        </padding>
+
+        <!-- 标题栏：标题在左，按钮紧凑右对齐 -->
+        <HBox spacing="8" alignment="CENTER_LEFT">
+            <Label fx:id="sessionTitle" text="选择一个会话查看" styleClass="session-title"
+                   wrapText="true" HBox.hgrow="ALWAYS" />
+            <Region HBox.hgrow="SOMETIMES" />
+            <Button text="复制" onAction="#onCopyAll" styleClass="compact-action-button" />
+            <Button text="导MD" onAction="#onExportMarkdown" styleClass="compact-action-button" />
+            <Button text="导JSON" onAction="#onExportJson" styleClass="compact-action-button" />
+        </HBox>
+
+        <!-- 会话元数据 -->
+        <HBox spacing="12">
+            <Label fx:id="sessionSource" text="来源: " style="-fx-font-size: 11px; -fx-text-fill: #666;" />
+            <Label fx:id="sessionModel" text="模型: " style="-fx-font-size: 11px; -fx-text-fill: #666;" />
+            <Label fx:id="sessionTime" text="时间: " style="-fx-font-size: 11px; -fx-text-fill: #666;" />
+        </HBox>
+
+        <!-- 搜索匹配导航栏（仅搜索时可见） -->
+        <HBox fx:id="searchNavBar" spacing="6" alignment="CENTER_LEFT" visible="false" managed="false">
+            <Button fx:id="prevMatchBtn" text="▲ 上一个" onAction="#onPrevMatch"
+                    styleClass="compact-action-button" prefHeight="24" />
+            <Button fx:id="nextMatchBtn" text="▼ 下一个" onAction="#onNextMatch"
+                    styleClass="compact-action-button" prefHeight="24" />
+            <Label fx:id="matchCountLabel" text="" style="-fx-font-size:11px;-fx-text-fill:#666;" />
+        </HBox>
+
+        <!-- WebView 对话内容区域 -->
+        <WebView fx:id="contentWebView" VBox.vgrow="ALWAYS" />
+    </VBox>
+
+    <!-- 底部状态栏 -->
+    <bottom>
+        <HBox styleClass="status-bar" alignment="CENTER_LEFT" spacing="15">
+            <padding>
+                <Insets top="4" right="10" bottom="4" left="10" />
+            </padding>
+            <Label fx:id="statusLabel" text="就绪" />
+            <Label fx:id="dataSourceStatus" text="" />
+        </HBox>
+    </bottom>
+
+</BorderPane>
