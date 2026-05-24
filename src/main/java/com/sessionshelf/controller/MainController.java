@@ -2,12 +2,11 @@ package com.sessionshelf.controller;
 
 import com.sessionshelf.config.AppConfig;
 import com.sessionshelf.model.Session;
-import com.sessionshelf.model.Tag;
 import com.sessionshelf.model.enums.SourceType;
 import com.sessionshelf.service.ExportService;
+import com.sessionshelf.service.FavoriteService;
 import com.sessionshelf.service.SessionService;
 import com.sessionshelf.service.SyncService;
-import com.sessionshelf.service.TagService;
 import com.sessionshelf.util.ClipboardUtil;
 
 import javafx.application.Platform;
@@ -49,8 +48,6 @@ public class MainController implements Initializable {
 
     @FXML private TextField searchField;
     @FXML private TreeView<PathNode> folderTree;
-    @FXML private TextField newTagField;
-    @FXML private ListView<String> tagList;
 
     @FXML private ComboBox<String> sourceFilter;
     @FXML private ComboBox<String> sortOrder;
@@ -72,18 +69,15 @@ public class MainController implements Initializable {
     @FXML private Label dataSourceStatus;
 
     private SessionService sessionService;
-    private TagService tagService;
     private SyncService syncService;
     private ExportService exportService;
     private AppConfig config;
 
     private ObservableList<Session> sessions;
-    private ObservableList<String> tags;
     private List<Session> allSessions;
 
     private Session selectedSession;
     private String selectedFolderPath;
-    private String selectedTagId;
 
     // 搜索功能
     private boolean caseSensitive = false;
@@ -93,6 +87,10 @@ public class MainController implements Initializable {
     private Map<String, String> contentCache = new HashMap<>();
     // 当前搜索关键词（原始输入）
     private String currentSearchText = "";
+
+    // 收藏功能
+    private FavoriteService favoriteService;
+    private Set<String> favoriteSessionIds = new HashSet<>();
 
     // 主题
     private String currentTheme = "light";
@@ -116,6 +114,7 @@ public class MainController implements Initializable {
 
     private static final String NODE_ALL = "ALL";
     private static final String NODE_UNCLASSIFIED = "UNCLASSIFIED";
+    private static final String NODE_FAVORITE = "FAVORITE";
 
     /**
      * 目录树节点
@@ -146,16 +145,14 @@ public class MainController implements Initializable {
     public void initialize(URL url, ResourceBundle resourceBundle) {
         config = AppConfig.getInstance();
         sessionService = new SessionService();
-        tagService = new TagService();
+        favoriteService = new FavoriteService();
         syncService = new SyncService();
         exportService = new ExportService(syncService);
 
         sessions = FXCollections.observableArrayList();
-        tags = FXCollections.observableArrayList();
         allSessions = new ArrayList<>();
 
         sessionList.setItems(sessions);
-        tagList.setItems(tags);
 
         // 加载扫描路径配置
         loadScanPaths();
@@ -166,22 +163,17 @@ public class MainController implements Initializable {
 
         initFilters();
         initFolderTree();
-        initTagList();
         initSearchField();
         buildLayout();
         loadData();
 
         sessionList.setCellFactory(param -> new SessionListCell());
-        tagList.setCellFactory(param -> new TagListCell());
 
         // 会话列表右键菜单
         initSessionContextMenu();
 
         sessionList.getSelectionModel().selectedItemProperty().addListener(
                 (obs, old, val) -> onSessionSelected(val));
-
-        tagList.getSelectionModel().selectedItemProperty().addListener(
-                (obs, old, val) -> onTagSelected(val));
 
         updateDataSourceStatus();
 
@@ -383,6 +375,10 @@ public class MainController implements Initializable {
         // 默认节点：所有会话
         TreeItem<PathNode> allItem = new TreeItem<>(new PathNode(NODE_ALL, "所有会话", null, "显示全部会话"));
         allItem.setExpanded(true);
+
+        // 收藏节点
+        TreeItem<PathNode> favoriteItem = new TreeItem<>(new PathNode(NODE_FAVORITE, "⭐ 收藏会话", null, "显示所有收藏的会话"));
+        root.getChildren().add(favoriteItem);
         root.getChildren().add(allItem);
 
         // 默认节点：未归档
@@ -425,11 +421,11 @@ public class MainController implements Initializable {
     private void buildPathTree(List<Session> sessionListData) {
         TreeItem<PathNode> root = folderTree.getRoot();
 
-        // 保留默认的"所有会话"和"未归档"节点
-        while (root.getChildren().size() > 2) {
-            root.getChildren().remove(2);
+        // 保留默认的"收藏"、"所有会话"和"未归档"节点
+        while (root.getChildren().size() > 3) {
+            root.getChildren().remove(3);
         }
-        TreeItem<PathNode> unclassifiedItem = root.getChildren().get(1);
+        TreeItem<PathNode> unclassifiedItem = root.getChildren().get(2);
 
         // === 第一步：按盘符收集所有会话的工作目录 ===
         Map<String, List<String[]>> driveToComponentPaths = new TreeMap<>();
@@ -523,6 +519,12 @@ public class MainController implements Initializable {
             driveNode.displayName = drive + " (" + driveCount + ")";
         }
 
+        // 更新收藏计数
+        int favCount = (int) sessionListData.stream()
+                .filter(s -> favoriteSessionIds.contains(s.getSessionId()))
+                .count();
+        root.getChildren().get(0).getValue().displayName = "⭐ 收藏会话 (" + favCount + ")";
+
         // 更新未归档计数
         long unclassifiedCount = sessionListData.stream()
                 .filter(s -> s.getWorkingDirectory() == null || s.getWorkingDirectory().trim().isEmpty())
@@ -542,6 +544,8 @@ public class MainController implements Initializable {
                 selectedFolderPath = null;
             } else if (NODE_UNCLASSIFIED.equals(node.getNodeType())) {
                 selectedFolderPath = "__UNCLASSIFIED__";
+            } else if (NODE_FAVORITE.equals(node.getNodeType())) {
+                selectedFolderPath = "__FAVORITE__";
             } else {
                 selectedFolderPath = node.getFullPath();
             }
@@ -551,7 +555,35 @@ public class MainController implements Initializable {
 
     // ============ 会话列表右键菜单 ============
 
+    /**
+     * 切换会话收藏状态
+     */
+    private void toggleFavorite(Session session) {
+        try {
+            boolean nowFav = favoriteService.toggleFavorite(session.getSessionId());
+            if (nowFav) {
+                favoriteSessionIds.add(session.getSessionId());
+                statusLabel.setText("已收藏: " + session.getTitle());
+            } else {
+                favoriteSessionIds.remove(session.getSessionId());
+                statusLabel.setText("已取消收藏: " + session.getTitle());
+            }
+            // 刷新列表（更新星标显示）
+            sessionList.refresh();
+            // 刷新目录树收藏计数
+            buildPathTree(allSessions);
+        } catch (SQLException e) {
+            showError("收藏操作失败", e.getMessage());
+        }
+    }
+
     private void initSessionContextMenu() {
+        MenuItem toggleFav = new MenuItem("⭐ 收藏/取消收藏");
+        toggleFav.setOnAction(e -> {
+            Session sel = sessionList.getSelectionModel().getSelectedItem();
+            if (sel != null) toggleFavorite(sel);
+        });
+
         MenuItem copyId = new MenuItem("复制恢复命令（claude --resume）");
         copyId.setOnAction(e -> {
             Session sel = sessionList.getSelectionModel().getSelectedItem();
@@ -601,24 +633,8 @@ public class MainController implements Initializable {
             });
         });
 
-        ContextMenu menu = new ContextMenu(copyId, copyTitle, copyPath, new SeparatorMenuItem(), deleteSession);
+        ContextMenu menu = new ContextMenu(toggleFav, copyId, copyTitle, copyPath, new SeparatorMenuItem(), deleteSession);
         sessionList.setContextMenu(menu);
-    }
-
-    // ============ 标签 ============
-
-    private void initTagList() {
-        refreshTagList();
-    }
-
-    private void refreshTagList() {
-        try {
-            tags.clear();
-            List<Tag> data = tagService.getAllTags();
-            for (Tag t : data) tags.add(t.getTagName());
-        } catch (SQLException e) {
-            showError("加载标签失败", e.getMessage());
-        }
     }
 
     // ============ 数据加载 ============
@@ -637,6 +653,9 @@ public class MainController implements Initializable {
             if (filtered > 0) {
                 statusLabel.setText("已过滤 " + filtered + " 条空会话");
             }
+            try {
+                favoriteSessionIds = favoriteService.getAllFavoriteIds();
+            } catch (SQLException ignored) {}
             sessions.clear();
             sessions.addAll(allSessions);
             buildPathTree(allSessions);
@@ -659,6 +678,8 @@ public class MainController implements Initializable {
             if ("__UNCLASSIFIED__".equals(selectedFolderPath)) {
                 // 未归档：workingDirectory 为空的会话
                 result.removeIf(s -> s.getWorkingDirectory() != null && !s.getWorkingDirectory().trim().isEmpty());
+            } else if ("__FAVORITE__".equals(selectedFolderPath)) {
+                result.removeIf(s -> !favoriteSessionIds.contains(s.getSessionId()));
             } else {
                 // 按 workingDirectory 前缀匹配
                 String normalized = normalizePath(selectedFolderPath);
@@ -675,16 +696,6 @@ public class MainController implements Initializable {
         if (src != null && !"全部来源".equals(src)) {
             SourceType type = getSourceTypeByName(src);
             if (type != null) result.removeIf(s -> s.getSourceType() != type);
-        }
-
-        // 标签筛选
-        if (selectedTagId != null && !selectedTagId.isEmpty()) {
-            try {
-                List<Session> byTag = sessionService.getSessionsByTagId(selectedTagId);
-                Set<String> ids = new HashSet<>();
-                for (Session s : byTag) ids.add(s.getSessionId());
-                result.removeIf(s -> !ids.contains(s.getSessionId()));
-            } catch (SQLException ignored) {}
         }
 
         // 全文搜索（多关键词 AND 逻辑 + 内容全文匹配）
@@ -751,22 +762,6 @@ public class MainController implements Initializable {
     private void onSessionSelected(Session session) {
         selectedSession = session;
         if (session != null) displaySessionDetail(session);
-    }
-
-    private void onTagSelected(String tagName) {
-        if (tagName == null) {
-            selectedTagId = null;
-        } else {
-            try {
-                for (Tag t : tagService.getAllTags()) {
-                    if (t.getTagName().equals(tagName)) {
-                        selectedTagId = t.getTagId();
-                        break;
-                    }
-                }
-            } catch (SQLException e) { selectedTagId = null; }
-        }
-        filterSessions();
     }
 
     // ============ WebView 渲染 ============
@@ -1072,7 +1067,6 @@ public class MainController implements Initializable {
             int count = syncService.syncAll();
             Platform.runLater(() -> {
                 loadData();
-                refreshTagList();
                 updateDataSourceStatus();
                 statusLabel.setText("同步完成，共 " + count + " 条");
             });
@@ -1178,57 +1172,6 @@ public class MainController implements Initializable {
         } catch (Exception e) {
             System.err.println("主题切换失败: " + e.getMessage());
         }
-    }
-
-    // ============ 标签操作 ============
-
-    @FXML
-    private void onNewTag() {
-        String name = newTagField.getText();
-        if (name == null || name.trim().isEmpty()) { showAlert("提示", "请输入标签名称"); return; }
-        try {
-            tagService.createTag(name.trim());
-            newTagField.clear();
-            refreshTagList();
-            statusLabel.setText("标签创建成功: " + name);
-        } catch (SQLException e) { showError("创建失败", e.getMessage()); }
-    }
-
-    @FXML
-    private void onRenameTag() {
-        String sel = tagList.getSelectionModel().getSelectedItem();
-        if (sel == null) { showAlert("提示", "请先选择标签"); return; }
-
-        TextInputDialog d = new TextInputDialog(sel);
-        d.setTitle("重命名标签");
-        d.setContentText("名称:");
-        d.showAndWait().ifPresent(newName -> {
-            try {
-                for (Tag t : tagService.getAllTags()) {
-                    if (t.getTagName().equals(sel)) { tagService.renameTag(t.getTagId(), newName); break; }
-                }
-                refreshTagList();
-            } catch (SQLException e) { showError("重命名失败", e.getMessage()); }
-        });
-    }
-
-
-    @FXML
-    private void onDeleteTag() {
-        String sel = tagList.getSelectionModel().getSelectedItem();
-        if (sel == null) { showAlert("提示", "请先选择标签"); return; }
-
-        Alert c = new Alert(Alert.AlertType.CONFIRMATION, "确定删除标签「" + sel + "」？");
-        c.showAndWait().ifPresent(r -> {
-            if (r == ButtonType.OK) {
-                try {
-                    for (Tag t : tagService.getAllTags()) {
-                        if (t.getTagName().equals(sel)) { tagService.deleteTag(t.getTagId()); break; }
-                    }
-                    refreshTagList();
-                } catch (SQLException e) { showError("删除失败", e.getMessage()); }
-            }
-        });
     }
 
     // ============ 会话操作 ============
@@ -1401,6 +1344,12 @@ public class MainController implements Initializable {
                 Label time = new Label(session.getCreateTime() != null ? session.getCreateTime().toLocalDate().toString() : "");
                 time.setStyle("-fx-font-size:10px;-fx-text-fill:#999;");
                 info.getChildren().addAll(srcLabel, time);
+                // 收藏星标
+                if (favoriteSessionIds.contains(session.getSessionId())) {
+                    Label star = new Label("⭐");
+                    star.setStyle("-fx-font-size:11px;");
+                    info.getChildren().add(star);
+                }
                 vbox.getChildren().add(info);
 
                 // 内容预览：有搜索词时高亮
@@ -1446,18 +1395,4 @@ public class MainController implements Initializable {
         }
     }
 
-    private class TagListCell extends ListCell<String> {
-        @Override
-        protected void updateItem(String tag, boolean empty) {
-            super.updateItem(tag, empty);
-            if (empty || tag == null) {
-                setText(null);
-                setGraphic(null);
-            } else {
-                Label l = new Label(tag);
-                l.setStyle("-fx-padding:3 10;-fx-background-color:#e8f5e9;-fx-background-radius:10;-fx-font-size:11px;");
-                setGraphic(l);
-            }
-        }
-    }
 }
