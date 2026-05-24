@@ -4,6 +4,7 @@ import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import com.sessionshelf.dao.DatabaseManager;
 import com.sessionshelf.controller.MainController;
@@ -41,6 +42,16 @@ public class App extends Application {
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(1000);
         primaryStage.setMinHeight(600);
+
+        // 设置窗口图标
+        try {
+            Image logo = new Image(getClass().getResourceAsStream("/images/logo.png"));
+            if (logo != null) {
+                primaryStage.getIcons().add(logo);
+            }
+        } catch (Exception ignored) {
+            // 图标文件不存在时使用默认图标
+        }
 
         // 窗口关闭时保存配置和布局位置
         primaryStage.setOnCloseRequest(event -> {

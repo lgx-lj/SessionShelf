@@ -22,6 +22,7 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import javafx.scene.web.WebView;
 import javafx.stage.DirectoryChooser;
+import netscape.javascript.JSObject;
 
 import java.io.File;
 import java.net.URL;
@@ -830,20 +831,22 @@ public class MainController implements Initializable {
         html.append(buildHtmlFooter());
         contentWebView.getEngine().loadContent(html.toString());
 
-        // 渲染完成后自动滚动到第一个匹配位置
-        if (currentSearchText != null && !currentSearchText.isEmpty()) {
-            contentWebView.getEngine().getLoadWorker().stateProperty().addListener(new javafx.beans.value.ChangeListener<javafx.concurrent.Worker.State>() {
-                @Override
-                public void changed(javafx.beans.value.ObservableValue<? extends javafx.concurrent.Worker.State> obs,
-                                    javafx.concurrent.Worker.State old, javafx.concurrent.Worker.State state) {
-                    if (state == javafx.concurrent.Worker.State.SUCCEEDED) {
-                        contentWebView.getEngine().executeScript(buildMatchNavigationJs());
-                        updateMatchCountLabel();
-                        contentWebView.getEngine().getLoadWorker().stateProperty().removeListener(this);
+        // 注入 Java 桥接（代码块复制）+ 匹配导航
+        contentWebView.getEngine().getLoadWorker().stateProperty().addListener((obs, old, state) -> {
+            if (state == javafx.concurrent.Worker.State.SUCCEEDED) {
+                JSObject window = (JSObject) contentWebView.getEngine().executeScript("window");
+                window.setMember("javaBridge", new Object() {
+                    public void copyCode(String code) {
+                        ClipboardUtil.copyToClipboard(code);
                     }
+                });
+                try { contentWebView.getEngine().executeScript("initCopyButtons()"); } catch (Exception ignored) {}
+                if (currentSearchText != null && !currentSearchText.isEmpty()) {
+                    contentWebView.getEngine().executeScript(buildMatchNavigationJs());
+                    updateMatchCountLabel();
                 }
-            });
-        }
+            }
+        });
     }
 
     private String buildHtmlHeader() {
@@ -894,7 +897,47 @@ public class MainController implements Initializable {
             """;
     }
 
-    private String buildHtmlFooter() { return "</body></html>"; }
+    private String buildHtmlFooter() {
+        return """
+            <style>
+            pre{position:relative}
+            .copy-btn{position:absolute;top:4px;right:4px;padding:3px 10px;font-size:11px;
+              border:none;border-radius:4px;cursor:pointer;opacity:0;transition:opacity .2s;
+              font-family:sans-serif;z-index:10;background:#45475a;color:#cdd6f4}
+            pre:hover .copy-btn{opacity:.85}
+            .copy-btn:hover{opacity:1}
+            .copy-toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+              padding:6px 18px;border-radius:6px;font-size:12px;color:#fff;
+              background:rgba(0,0,0,.7);z-index:9999;pointer-events:none;
+              animation:toastIn .3s ease,toastOut .3s ease 1.2s}
+            @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}
+              to{opacity:1;transform:translateX(-50%) translateY(0)}}
+            @keyframes toastOut{from{opacity:1}to{opacity:0}}
+            </style>
+            <script>
+            function initCopyButtons(){
+              document.querySelectorAll('pre').forEach(function(pre){
+                if(pre.querySelector('.copy-btn')) return;
+                var btn=document.createElement('button');
+                btn.className='copy-btn';
+                btn.textContent='复制';
+                btn.onclick=function(){
+                  var code=pre.querySelector('code');
+                  var text=code?code.textContent:pre.textContent;
+                  try{window.javaBridge.copyCode(text)}catch(e){}
+                  var toast=document.createElement('div');
+                  toast.className='copy-toast';
+                  toast.textContent='✔ 已复制';
+                  document.body.appendChild(toast);
+                  setTimeout(function(){toast.remove()},1500);
+                };
+                pre.appendChild(btn);
+              });
+            }
+            </script>
+            </body></html>
+            """;
+    }
 
     private String buildLoadingHtml() {
         return "<html><body style='display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#999'><div style='text-align:center'><div style='font-size:20px'>⏳</div><div>加载中...</div></div></body></html>";

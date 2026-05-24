@@ -37,7 +37,16 @@
       "Bash(grep -o '\"cwd\":\"[^\"]*\"' \"C:/Users/LiGuoXian/.claude/projects/D--SoftwareCoding-workspace-LGX-ai-SessionShelf/1c524463-799b-4284-9e77-c6b302987995.jsonl\")",
       "Bash(head -1)",
       "Bash(echo \"---\")",
-      "Bash(grep -m1 '\"cwd\"' \"C:/Users/LiGuoXian/.claude/projects/D--SoftwareCoding-workspace-LGX-LIVEService/\"*.jsonl)"
+      "Bash(grep -m1 '\"cwd\"' \"C:/Users/LiGuoXian/.claude/projects/D--SoftwareCoding-workspace-LGX-LIVEService/\"*.jsonl)",
+      "Bash(python3 *)",
+      "Bash(python *)",
+      "Bash(winget install *)",
+      "Bash(where light.exe)",
+      "Bash(where /R \"C:\\\\Program Files \\(x86\\)\\\\WiX Toolset\" light.exe)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(dir \"C:\\\\Program Files \\(x86\\)\\\\WiX Toolset v3.14\")",
+      "Bash(dir \"C:\\\\Program Files \\(x86\\)\\\\WiX Toolset v3.11\")"
     ]
   }
 }
