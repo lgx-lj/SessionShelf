@@ -604,6 +604,54 @@ public class MainController implements Initializable {
             }
         });
 
+        MenuItem openPowerShell = new MenuItem("在此路径打开 PowerShell");
+        openPowerShell.setOnAction(e -> {
+            Session sel = sessionList.getSelectionModel().getSelectedItem();
+            if (sel == null) {
+                showAlert("错误", "未选中会话");
+                return;
+            }
+            String workingDir = sel.getWorkingDirectory();
+            if (workingDir == null || workingDir.trim().isEmpty()) {
+                showAlert("错误", "该会话没有工作目录信息（请刷新同步获取最新数据）");
+                return;
+            }
+            workingDir = workingDir.trim();
+            try {
+                String escapedPath = workingDir.replace("'", "''");
+                // PowerShell 命令
+                String psCommand = "Set-Location -LiteralPath '" + escapedPath + "'";
+
+                // 优先检测 Windows Terminal，其次传统 PowerShell
+                String terminalExe = "powershell.exe";
+                try {
+                    new ProcessBuilder("where", "wt.exe").start().waitFor();
+                    // wt.exe 存在，用 Windows Terminal 包装
+                    if (Runtime.getRuntime().exec(new String[]{"where", "wt.exe"}).waitFor() == 0) {
+                        // Windows Terminal 可用，但为了兼容直接用 PowerShell 新窗口
+                    }
+                } catch (Exception ignored) {}
+
+
+                // 使用 cmd /c start 启动独立 PowerShell 窗口
+                // 命令格式: cmd /c start "Sessionshelf" powershell.exe -NoExit -Command "..."
+                String[] cmd = {
+                    "cmd.exe", "/c", "start", "\"Sessionshelf\"",
+                    "powershell.exe", "-NoExit", "-NoLogo",
+                    "-Command", psCommand
+                };
+                System.out.println("[打开PS] 路径: " + workingDir);
+                System.out.println("[打开PS] 命令: " + psCommand);
+
+                Process proc = new ProcessBuilder(cmd).start();
+                statusLabel.setText("已打开 PowerShell: " + workingDir);
+            } catch (Exception ex) {
+                String errMsg = "命令执行失败: " + ex.getMessage();
+                System.err.println("[打开PS] " + errMsg);
+                showAlert("错误", errMsg);
+            }
+        });
+
         MenuItem copyPath = new MenuItem("复制文件路径");
         copyPath.setOnAction(e -> {
             Session sel = sessionList.getSelectionModel().getSelectedItem();
@@ -634,7 +682,7 @@ public class MainController implements Initializable {
             });
         });
 
-        ContextMenu menu = new ContextMenu(toggleFav, copyId, copyTitle, copyPath, new SeparatorMenuItem(), deleteSession);
+        ContextMenu menu = new ContextMenu(toggleFav, copyId, copyTitle, openPowerShell, new SeparatorMenuItem(), deleteSession);
         sessionList.setContextMenu(menu);
     }
 
