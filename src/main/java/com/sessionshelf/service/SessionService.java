@@ -136,4 +136,11 @@ public class SessionService {
         // 再删除会话
         sessionDAO.delete(sessionId);
     }
+
+    /**
+     * 更新会话的最后恢复时间
+     */
+    public void updateLastResumeTime(String sessionId, java.time.LocalDateTime time) throws SQLException {
+        sessionDAO.updateLastResumeTime(sessionId, time);
+    }
 }

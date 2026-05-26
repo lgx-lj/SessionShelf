@@ -213,6 +213,17 @@ public class SessionDAO {
         session.setContentPreview(rs.getString("content_preview"));
         session.setSourceFilePath(rs.getString("source_file_path"));
         session.setWorkingDirectory(rs.getString("working_directory"));
+        Timestamp lrt = rs.getTimestamp("last_resume_time");
+        if (lrt != null) session.setLastResumeTime(lrt.toLocalDateTime());
         return session;
+    }
+
+    public void updateLastResumeTime(String sessionId, LocalDateTime time) throws SQLException {
+        String sql = "UPDATE session_base SET last_resume_time = ? WHERE session_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setTimestamp(1, Timestamp.valueOf(time));
+            pstmt.setString(2, sessionId);
+            pstmt.executeUpdate();
+        }
     }
 }

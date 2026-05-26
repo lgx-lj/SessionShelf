@@ -113,14 +113,25 @@ public class DatabaseManager {
             // 兼容旧数据库：添加 working_directory 列
             try {
                 stmt.execute("ALTER TABLE session_base ADD COLUMN working_directory TEXT");
-            } catch (SQLException ignored) {
-                // 列已存在则忽略
-            }
+            } catch (SQLException ignored) {}
+
+            // 兼容旧数据库：添加 last_resume_time 列
+            try {
+                stmt.execute("ALTER TABLE session_base ADD COLUMN last_resume_time TIMESTAMP");
+            } catch (SQLException ignored) {}
+
 
             // 收藏会话表
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS session_favorite (
                     session_id TEXT PRIMARY KEY
+                )
+            """);
+
+            // 收藏项目表
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS project_favorite (
+                    project_name TEXT PRIMARY KEY
                 )
             """);
         }

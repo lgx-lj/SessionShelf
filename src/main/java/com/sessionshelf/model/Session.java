@@ -17,6 +17,7 @@ public class Session {
     private String contentPreview;
     private String sourceFilePath;
     private String workingDirectory;
+    private LocalDateTime lastResumeTime;
 
     public Session() {}
 
@@ -60,4 +61,7 @@ public class Session {
 
     public String getWorkingDirectory() { return workingDirectory; }
     public void setWorkingDirectory(String workingDirectory) { this.workingDirectory = workingDirectory; }
+
+    public LocalDateTime getLastResumeTime() { return lastResumeTime; }
+    public void setLastResumeTime(LocalDateTime lastResumeTime) { this.lastResumeTime = lastResumeTime; }
 }

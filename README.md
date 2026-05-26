@@ -1,6 +1,8 @@
 # AI 会话管家 - SessionShelf
 
 本地离线多源 AI 会话统一管理工具
+![img.png](img.png)
+![img_1.png](img_1.png)
 
 ## 功能特性
 
