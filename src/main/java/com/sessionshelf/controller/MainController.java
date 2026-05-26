@@ -5,6 +5,7 @@ import com.sessionshelf.model.Session;
 import com.sessionshelf.model.enums.SourceType;
 import com.sessionshelf.service.ExportService;
 import com.sessionshelf.service.FavoriteService;
+import com.sessionshelf.service.FavoriteProjectService;
 import com.sessionshelf.service.SessionService;
 import com.sessionshelf.service.SyncService;
 import com.sessionshelf.util.ClipboardUtil;
@@ -27,6 +28,7 @@ import netscape.javascript.JSObject;
 import java.io.File;
 import java.net.URL;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -92,6 +94,8 @@ public class MainController implements Initializable {
     // 收藏功能
     private FavoriteService favoriteService;
     private Set<String> favoriteSessionIds = new HashSet<>();
+    private FavoriteProjectService favoriteProjectService;
+    private Set<String> favoriteProjectNames = new HashSet<>();
 
     // 主题
     private String currentTheme = "light";
@@ -116,6 +120,7 @@ public class MainController implements Initializable {
     private static final String NODE_ALL = "ALL";
     private static final String NODE_UNCLASSIFIED = "UNCLASSIFIED";
     private static final String NODE_FAVORITE = "FAVORITE";
+    private static final String NODE_FAV_PROJECT = "FAV_PROJECT";
 
     /**
      * 目录树节点
@@ -147,6 +152,7 @@ public class MainController implements Initializable {
         config = AppConfig.getInstance();
         sessionService = new SessionService();
         favoriteService = new FavoriteService();
+        favoriteProjectService = new FavoriteProjectService();
         syncService = new SyncService();
         exportService = new ExportService(syncService);
 
@@ -360,8 +366,8 @@ public class MainController implements Initializable {
         sourceFilter.setValue("全部来源");
         sourceFilter.setOnAction(e -> filterSessions());
 
-        sortOrder.setItems(FXCollections.observableArrayList("时间倒序", "时间正序"));
-        sortOrder.setValue("时间倒序");
+        sortOrder.setItems(FXCollections.observableArrayList("最近恢复", "时间倒序", "时间正序"));
+        sortOrder.setValue("最近恢复");
         sortOrder.setOnAction(e -> filterSessions());
     }
 
@@ -376,6 +382,10 @@ public class MainController implements Initializable {
         // 默认节点：所有会话
         TreeItem<PathNode> allItem = new TreeItem<>(new PathNode(NODE_ALL, "所有会话", null, "显示全部会话"));
         allItem.setExpanded(true);
+
+        // 收藏项目节点
+        TreeItem<PathNode> favProjectItem = new TreeItem<>(new PathNode(NODE_FAV_PROJECT, "⭐ 收藏项目", null, "按工作目录最后一层分组，显示某项目下的全部会话"));
+        root.getChildren().add(favProjectItem);
 
         // 收藏节点
         TreeItem<PathNode> favoriteItem = new TreeItem<>(new PathNode(NODE_FAVORITE, "⭐ 收藏会话", null, "显示所有收藏的会话"));
@@ -422,11 +432,12 @@ public class MainController implements Initializable {
     private void buildPathTree(List<Session> sessionListData) {
         TreeItem<PathNode> root = folderTree.getRoot();
 
-        // 保留默认的"收藏"、"所有会话"和"未归档"节点
-        while (root.getChildren().size() > 3) {
-            root.getChildren().remove(3);
+        // 保留默认的收藏项目、收藏会话、所有会话、未归档节点
+        while (root.getChildren().size() > 4) {
+            root.getChildren().remove(4);
         }
-        TreeItem<PathNode> unclassifiedItem = root.getChildren().get(2);
+        TreeItem<PathNode> favProjectRoot = root.getChildren().get(0);
+        TreeItem<PathNode> unclassifiedItem = root.getChildren().get(3);
 
         // === 第一步：按盘符收集所有会话的工作目录 ===
         Map<String, List<String[]>> driveToComponentPaths = new TreeMap<>();
@@ -520,11 +531,34 @@ public class MainController implements Initializable {
             driveNode.displayName = drive + " (" + driveCount + ")";
         }
 
-        // 更新收藏计数
+        // === 构建收藏项目子节点（每个收藏项目显示为一个按项目筛选的虚拟节点） ===
+        favProjectRoot.getChildren().clear();
+        // 按 workingDirectory 最后一层分组
+        Map<String, Long> projectCounts = new TreeMap<>();
+        for (Session s : sessionListData) {
+            String wd = s.getWorkingDirectory();
+            if (wd == null || wd.trim().isEmpty()) continue;
+            String projectName = extractProjectNameFromPath(wd.trim());
+            if (projectName == null || projectName.isEmpty()) continue;
+            projectCounts.merge(projectName, 1L, Long::sum);
+        }
+        for (Map.Entry<String, Long> entry : projectCounts.entrySet()) {
+            String pn = entry.getKey();
+            long cnt = entry.getValue();
+            boolean isFav = favoriteProjectNames.contains(pn);
+            if (!isFav) continue; // 只显示已收藏的项目
+            PathNode pnNode = new PathNode("PROJECT", pn + " (" + cnt + ")", pn, pn);
+            TreeItem<PathNode> pnItem = new TreeItem<>(pnNode);
+            favProjectRoot.getChildren().add(pnItem);
+        }
+        favProjectRoot.getValue().displayName = "⭐ 收藏项目 (" + favoriteProjectNames.size() + ")";
+        favProjectRoot.setExpanded(true);
+
+        // 更新收藏会话计数
         int favCount = (int) sessionListData.stream()
                 .filter(s -> favoriteSessionIds.contains(s.getSessionId()))
                 .count();
-        root.getChildren().get(0).getValue().displayName = "⭐ 收藏会话 (" + favCount + ")";
+        root.getChildren().get(1).getValue().displayName = "⭐ 收藏会话 (" + favCount + ")";
 
         // 更新未归档计数
         long unclassifiedCount = sessionListData.stream()
@@ -547,11 +581,30 @@ public class MainController implements Initializable {
                 selectedFolderPath = "__UNCLASSIFIED__";
             } else if (NODE_FAVORITE.equals(node.getNodeType())) {
                 selectedFolderPath = "__FAVORITE__";
+            } else if (NODE_FAV_PROJECT.equals(node.getNodeType())) {
+                selectedFolderPath = "__FAV_PROJECT__";
+            } else if ("PROJECT".equals(node.getNodeType())) {
+                // 按项目名筛选
+                selectedFolderPath = "__PROJECT__:" + node.getFullPath();
             } else {
                 selectedFolderPath = node.getFullPath();
             }
         }
         filterSessions();
+    }
+
+    /** 从工作目录路径提取最后一级文件夹名 */
+    private String extractProjectNameFromPath(String wd) {
+        if (wd == null) return null;
+        String normalized = wd.replace("\\", "/");
+        if (normalized.endsWith("/")) normalized = normalized.substring(0, normalized.length() - 1);
+        int lastSlash = normalized.lastIndexOf('/');
+        if (lastSlash >= 0 && lastSlash < normalized.length() - 1) {
+            return normalized.substring(lastSlash + 1);
+        }
+        // 如果是盘符根路径，用盘符作为项目名
+        if (normalized.length() == 2 && normalized.endsWith(":")) return normalized;
+        return normalized;
     }
 
     // ============ 会话列表右键菜单 ============
@@ -578,11 +631,88 @@ public class MainController implements Initializable {
         }
     }
 
+    private void toggleFavoriteProject(Session session) {
+        String wd = session.getWorkingDirectory();
+        if (wd == null || wd.trim().isEmpty()) {
+            showAlert("提示", "该会话缺少工作目录信息");
+            return;
+        }
+        String projectName = extractProjectNameFromPath(wd.trim());
+        if (projectName == null || projectName.isEmpty()) {
+            showAlert("提示", "无法识别项目名称");
+            return;
+        }
+        try {
+            boolean nowFav = favoriteProjectService.toggle(projectName);
+            if (nowFav) {
+                favoriteProjectNames.add(projectName);
+                statusLabel.setText("已收藏项目: " + projectName);
+            } else {
+                favoriteProjectNames.remove(projectName);
+                statusLabel.setText("已取消收藏项目: " + projectName);
+            }
+            buildPathTree(allSessions);
+        } catch (SQLException e) {
+            showError("收藏项目失败", e.getMessage());
+        }
+    }
+
+    /**
+     * 一键恢复会话：在项目目录打开 PowerShell 并自动执行 claude --resume
+     */
+    private void oneClickResume(Session session) {
+        String workingDir = session.getWorkingDirectory();
+        String sessionId = session.getOriginalUniqueId();
+        if (workingDir == null || workingDir.trim().isEmpty()) {
+            showAlert("错误", "该会话缺少工作目录信息，请刷新同步");
+            return;
+        }
+        if (sessionId == null || sessionId.trim().isEmpty()) {
+            showAlert("错误", "该会话缺少会话 ID");
+            return;
+        }
+
+        String escapedPath = workingDir.trim().replace("'", "''");
+        String cmd = "Set-Location -LiteralPath '" + escapedPath + "'; claude --resume " + sessionId;
+        System.out.println("[一键恢复] 目录: " + workingDir);
+        System.out.println("[一键恢复] 命令: " + cmd);
+
+        try {
+            new ProcessBuilder(
+                "cmd.exe", "/c", "start", "\"Claude\"",
+                "powershell.exe", "-NoExit", "-NoLogo",
+                "-Command", cmd
+            ).start();
+            // 记录恢复时间
+            LocalDateTime now = LocalDateTime.now();
+            session.setLastResumeTime(now);
+            try { sessionService.updateLastResumeTime(session.getSessionId(), now); } catch (Exception ignored) {}
+            // 刷新排序
+            filterSessions();
+            statusLabel.setText("已恢复: " + sessionId);
+        } catch (Exception ex) {
+            showAlert("错误", "启动失败: " + ex.getMessage());
+        }
+    }
+
     private void initSessionContextMenu() {
+        // 一键恢复（置顶）
+        MenuItem resumeItem = new MenuItem("🚀 一键恢复会话");
+        resumeItem.setOnAction(e -> {
+            Session sel = sessionList.getSelectionModel().getSelectedItem();
+            if (sel != null) oneClickResume(sel);
+        });
+
         MenuItem toggleFav = new MenuItem("⭐ 收藏/取消收藏");
         toggleFav.setOnAction(e -> {
             Session sel = sessionList.getSelectionModel().getSelectedItem();
             if (sel != null) toggleFavorite(sel);
+        });
+
+        MenuItem toggleFavProject = new MenuItem("📁 收藏此项目");
+        toggleFavProject.setOnAction(e -> {
+            Session sel = sessionList.getSelectionModel().getSelectedItem();
+            if (sel != null) toggleFavoriteProject(sel);
         });
 
         MenuItem copyId = new MenuItem("复制恢复命令（claude --resume）");
@@ -682,7 +812,19 @@ public class MainController implements Initializable {
             });
         });
 
-        ContextMenu menu = new ContextMenu(toggleFav, copyId, copyTitle, openPowerShell, new SeparatorMenuItem(), deleteSession);
+        ContextMenu menu = new ContextMenu(
+            // 第一组：核心会话操作
+            resumeItem, toggleFav, toggleFavProject,
+            new SeparatorMenuItem(),
+            // 第二组：终端 / 命令相关
+            copyId, openPowerShell,
+            new SeparatorMenuItem(),
+            // 第三组：复制类
+            copyTitle, copyPath,
+            new SeparatorMenuItem(),
+            // 第四组：危险操作
+            deleteSession
+        );
         sessionList.setContextMenu(menu);
     }
 
@@ -704,6 +846,9 @@ public class MainController implements Initializable {
             }
             try {
                 favoriteSessionIds = favoriteService.getAllFavoriteIds();
+            } catch (SQLException ignored) {}
+            try {
+                favoriteProjectNames = favoriteProjectService.getAll();
             } catch (SQLException ignored) {}
             sessions.clear();
             sessions.addAll(allSessions);
@@ -729,6 +874,13 @@ public class MainController implements Initializable {
                 result.removeIf(s -> s.getWorkingDirectory() != null && !s.getWorkingDirectory().trim().isEmpty());
             } else if ("__FAVORITE__".equals(selectedFolderPath)) {
                 result.removeIf(s -> !favoriteSessionIds.contains(s.getSessionId()));
+            } else if (selectedFolderPath != null && selectedFolderPath.startsWith("__PROJECT__:")) {
+                String projectName = selectedFolderPath.substring("__PROJECT__:".length());
+                result.removeIf(s -> {
+                    String wd = s.getWorkingDirectory();
+                    if (wd == null || wd.trim().isEmpty()) return true;
+                    return !projectName.equals(extractProjectNameFromPath(wd.trim()));
+                });
             } else {
                 // 按 workingDirectory 前缀匹配
                 String normalized = normalizePath(selectedFolderPath);
@@ -754,8 +906,18 @@ public class MainController implements Initializable {
         }
 
         // 排序
-        if ("时间正序".equals(sortOrder.getValue())) {
+        String sort = sortOrder.getValue();
+        if ("时间正序".equals(sort)) {
             result.sort((a, b) -> compareTime(a, b, false));
+        } else if ("最近恢复".equals(sort)) {
+            result.sort((a, b) -> {
+                LocalDateTime ra = a.getLastResumeTime();
+                LocalDateTime rb = b.getLastResumeTime();
+                if (ra == null && rb == null) return compareTime(a, b, true); // 都没有恢复记录则按时按创建时间
+                if (ra == null) return 1;
+                if (rb == null) return -1;
+                return rb.compareTo(ra);
+            });
         } else {
             result.sort((a, b) -> compareTime(a, b, true));
         }
@@ -899,61 +1061,58 @@ public class MainController implements Initializable {
 
     private String buildHtmlHeader() {
         boolean dark = "dark".equals(currentTheme);
-        if (dark) {
-            return """
-                <!DOCTYPE html><html><head><meta charset="UTF-8">
-                <style>
-                *{box-sizing:border-box}
-                body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;padding:16px;background:#1e1e2e;margin:0;line-height:1.6;color:#cdd6f4}
-                .msg{margin-bottom:16px;display:flex;flex-direction:column}
-                .msg.user{align-items:flex-end}.msg.ai{align-items:flex-start}
-                .bubble{max-width:85%;padding:12px 16px;border-radius:14px;word-wrap:break-word;box-shadow:0 1px 2px rgba(0,0,0,0.2)}
-                .user .bubble{background:linear-gradient(135deg,#89b4fa,#74c7ec);color:#1e1e2e;border-bottom-right-radius:4px}
-                .ai .bubble{background:#313244;color:#cdd6f4;border-bottom-left-radius:4px;border:1px solid #45475a}
-                .role{font-size:11px;margin-bottom:4px;font-weight:600}
-                .user .role{color:rgba(137,180,250,0.8)}.ai .role{color:#6c7086}
-                .content{font-size:13.5px}
-                pre{background:#11111b;color:#cdd6f4;padding:14px;border-radius:8px;overflow-x:auto;font-size:12.5px;line-height:1.5;margin:8px 0;font-family:'Cascadia Code','Fira Code',Consolas,monospace;border:1px solid #313244}
-                code{font-family:'Cascadia Code','Fira Code',Consolas,monospace}
-                .ic{background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:3px;font-size:0.9em}
-                .user .ic{background:rgba(30,30,46,0.3)}
-                mark{background:#f9e2af;color:#1e1e2e;padding:1px 2px;border-radius:2px}
-                mark.active{background:#fab387;color:#1e1e2e}
-                </style></head><body>
-                """;
-        }
+        String bg           = dark ? "#1e1e2e" : "#f0f2f5";
+        String textColor    = dark ? "#cdd6f4" : "#333";
+        String userBubbleBg = dark ? "#89b4fa" : "#667eea";
+        String userText     = dark ? "#1e1e2e" : "#fff";
+        String aiBubbleBg   = dark ? "#313244" : "#fff";
+        String aiBorder     = dark ? "#45475a" : "#e0e0e0";
+        String preBg        = dark ? "#11111b" : "#1e1e2e";
+        String preBorder    = dark ? "#313244" : "#333";
+        String preText      = "#cdd6f4";
+        String shadow       = dark ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.08)";
+
         return """
             <!DOCTYPE html><html><head><meta charset="UTF-8">
             <style>
             *{box-sizing:border-box}
-            body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;padding:16px;background:#f5f7fa;margin:0;line-height:1.6}
-            .msg{margin-bottom:16px;display:flex;flex-direction:column}
-            .msg.user{align-items:flex-end}.msg.ai{align-items:flex-start}
-            .bubble{max-width:85%;padding:12px 16px;border-radius:14px;word-wrap:break-word;box-shadow:0 1px 2px rgba(0,0,0,0.06)}
-            .user .bubble{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-bottom-right-radius:4px}
-            .ai .bubble{background:#fff;color:#333;border-bottom-left-radius:4px;border:1px solid #e8ecf0}
-            .role{font-size:11px;margin-bottom:4px;font-weight:600}
-            .user .role{color:rgba(255,255,255,0.8)}.ai .role{color:#888}
-            .content{font-size:13.5px}
-            pre{background:#1e1e2e;color:#cdd6f4;padding:14px;border-radius:8px;overflow-x:auto;font-size:12.5px;line-height:1.5;margin:8px 0;font-family:'Cascadia Code','Fira Code',Consolas,monospace}
-            code{font-family:'Cascadia Code','Fira Code',Consolas,monospace}
-            .ic{background:rgba(0,0,0,0.07);padding:2px 5px;border-radius:3px;font-size:0.9em}
+            body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;padding:20px 16px;background:%1$s;margin:0;line-height:1.7;color:%2$s}
+            .msg{margin-bottom:20px;display:flex;flex-direction:column}
+            .msg.user{align-items:flex-end}
+            .msg.ai{align-items:flex-start}
+            .bubble{max-width:80%%;padding:12px 16px;border-radius:14px;word-wrap:break-word;box-shadow:%6$s;font-size:14px;line-height:1.65}
+            .user .bubble{background:%3$s;color:%4$s;border-bottom-right-radius:4px}
+            .ai .bubble{background:%5$s;color:%2$s;border-bottom-left-radius:4px;border:1px solid %9$s}
+            .role{font-size:11px;margin-bottom:4px;font-weight:600;letter-spacing:.3px}
+            .user .role{color:rgba(137,180,250,0.9)}
+            .ai .role{color:#6c7086}
+            .user .role:after{content:' 用户 ↑'}
+            .ai .role:after{content:' AI ↓'}
+            /* 代码块 */
+            pre{position:relative;background:%7$s;color:%8$s;padding:16px;border-radius:10px;overflow:auto;max-height:500px;font-size:13px;line-height:1.55;margin:10px 0;font-family:'JetBrains Mono','Cascadia Code','Fira Code',Consolas,monospace;border:1px solid %10$s;tab-size:4;white-space:pre;word-wrap:normal}
+            pre code{font-family:'JetBrains Mono','Cascadia Code','Fira Code',Consolas,monospace;font-size:13px;white-space:pre}
+            .ic{background:rgba(0,0,0,0.08);padding:2px 6px;border-radius:4px;font-size:0.92em;font-family:'JetBrains Mono','Cascadia Code','Fira Code',Consolas,monospace}
             .user .ic{background:rgba(255,255,255,0.2)}
-            mark{background:#fff176;color:#333;padding:1px 2px;border-radius:2px}
-            mark.active{background:#ff9800;color:#fff}
+            /* 高亮 */
+            mark{background:#f9e2af;color:#1e1e2e;padding:1px 2px;border-radius:2px}
+            mark.active{background:#fab387;color:#1e1e2e}
+            /* 语法高亮 */
+            .kw{color:#cba6f7} .str{color:#a6e3a1} .cm{color:#6c7086;font-style:italic}
+            .num{color:#fab387} .fn{color:#89b4fa} .op{color:#89dceb}
             </style></head><body>
-            """;
+            """.formatted(bg, textColor, userBubbleBg, userText, aiBubbleBg, shadow,
+                          preBg, preText, aiBorder, preBorder);
     }
 
     private String buildHtmlFooter() {
         return """
             <style>
             pre{position:relative}
-            .copy-btn{position:absolute;top:4px;right:4px;padding:3px 10px;font-size:11px;
-              border:none;border-radius:4px;cursor:pointer;opacity:0;transition:opacity .2s;
-              font-family:sans-serif;z-index:10;background:#45475a;color:#cdd6f4}
-            pre:hover .copy-btn{opacity:.85}
-            .copy-btn:hover{opacity:1}
+            .copy-btn{position:absolute;top:8px;right:8px;padding:5px 12px;font-size:11px;
+              border:none;border-radius:4px;cursor:pointer;opacity:.6;transition:all .2s;
+              font-family:sans-serif;z-index:100;background:#45475a;color:#cdd6f4;
+              box-shadow:0 1px 3px rgba(0,0,0,.3)}
+            .copy-btn:hover{opacity:1;background:#585b70;box-shadow:0 2px 8px rgba(137,180,250,.4)}
             .copy-toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
               padding:6px 18px;border-radius:6px;font-size:12px;color:#fff;
               background:rgba(0,0,0,.7);z-index:9999;pointer-events:none;
@@ -981,7 +1140,66 @@ public class MainController implements Initializable {
                 };
                 pre.appendChild(btn);
               });
+              highlightAllCode();
             }
+            function highlightAllCode(){
+              document.querySelectorAll('pre code').forEach(function(code){
+                if(code.dataset.highlighted) return;
+                code.dataset.highlighted='1';
+                var text=code.textContent;
+                var lang=code.className.replace('language-','');
+                // 简单的语法高亮：关键字、字符串、注释、数字
+                var result='';
+                var i=0;
+                while(i<text.length){
+                  // 单行注释 //
+                  if(text.substr(i,2)=='//'){
+                    var end=text.indexOf('\\n',i);
+                    if(end==-1) end=text.length;
+                    result+='<span class="cm">'+escapeH(text.substring(i,end))+'</span>';
+                    i=end; continue;
+                  }
+                  // 多行注释 /* */
+                  if(text.substr(i,2)=='/*'){
+                    var end=text.indexOf('*/',i);
+                    if(end==-1) end=text.length; else end+=2;
+                    result+='<span class="cm">'+escapeH(text.substring(i,end))+'</span>';
+                    i=end; continue;
+                  }
+                  // 字符串
+                  if(text[i]=='\''||text[i]=='"'||text[i]=='`'){
+                    var q=text[i],j=i+1;
+                    while(j<text.length&&text[j]!=q){if(text[j]=='\\\\')j++;j++;}
+                    if(j<text.length) j++;
+                    result+='<span class="str">'+escapeH(text.substring(i,j))+'</span>';
+                    i=j; continue;
+                  }
+                  // 数字
+                  if(/[0-9]/.test(text[i])&&(i==0||!/[a-zA-Z_]/.test(text[i-1]))){
+                    var j=i;
+                    while(j<text.length&&/[0-9a-fA-FxX._]/.test(text[j])) j++;
+                    result+='<span class="num">'+escapeH(text.substring(i,j))+'</span>';
+                    i=j; continue;
+                  }
+                  // 关键字
+                  var kwMatch=null;
+                  var kws=['public','private','class','void','int','String','if','else','for','while','return','new','static','final','import','package','try','catch','throw','throws','extends','implements','interface','abstract','boolean','char','double','float','long','short','byte','null','true','false','this','super','var','let','const','function','async','await','def','from','import','in','is','not','and','or','None','True','False','with','as','yield','lambda'];
+                  for(var k=0;k<kws.length;k++){
+                    var kw=kws[k];
+                    if(text.substr(i,kw.length)==kw&&(i+kw.length>=text.length||!/[a-zA-Z0-9_]/.test(text[i+kw.length]))&&(i==0||!/[a-zA-Z0-9_]/.test(text[i-1]))){
+                      kwMatch=kw; break;
+                    }
+                  }
+                  if(kwMatch){
+                    result+='<span class="kw">'+escapeH(kwMatch)+'</span>';
+                    i+=kwMatch.length; continue;
+                  }
+                  result+=escapeH(text[i]); i++;
+                }
+                code.innerHTML=result;
+              });
+            }
+            function escapeH(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
             </script>
             </body></html>
             """;
@@ -1413,28 +1631,34 @@ public class MainController implements Initializable {
                 setTooltip(null);
             } else {
                 VBox vbox = new VBox(3);
+                vbox.setPadding(new javafx.geometry.Insets(2, 0, 2, 0));
 
-                // 标题：有搜索词时用 TextFlow 高亮，否则用 Label
-                String titleText = session.getTitle() != null ? session.getTitle() : "未命名会话";
-                if (currentSearchText != null && !currentSearchText.isEmpty()) {
-                    TextFlow titleFlow = buildHighlightedText(titleText, "-fx-font-weight:bold;-fx-font-size:12.5px;");
-                    titleFlow.setMaxWidth(280);
-                    vbox.getChildren().add(titleFlow);
-                } else {
-                    Label title = new Label(titleText);
-                    title.setStyle("-fx-font-weight:bold;-fx-font-size:12.5px;");
-                    title.setWrapText(false);
-                    title.setMaxWidth(280);
-                    vbox.getChildren().add(title);
-                }
+                // 标题：只显示项目名（去掉 - sessionId 后缀）
+                String rawTitle = session.getTitle() != null ? session.getTitle() : "未命名会话";
+                String displayTitle = extractProjectTitle(rawTitle);
+                Label title = new Label(displayTitle);
+                title.setStyle("-fx-font-weight:bold;-fx-font-size:13px;");
+                title.setWrapText(false);
+                title.setMaxWidth(320);
+                title.setTooltip(new Tooltip(rawTitle));
+                vbox.getChildren().add(title);
 
+                // 信息行：来源 + 模型 + 时间 + 星标
                 HBox info = new HBox(6);
+                info.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
                 String src = session.getSourceType() != null ? session.getSourceType().getDisplayName() : "";
                 Label srcLabel = new Label(src);
                 srcLabel.setStyle("-fx-font-size:10px;-fx-text-fill:#666;-fx-background-color:#e3f2fd;-fx-padding:1 5;-fx-background-radius:6;");
+                info.getChildren().add(srcLabel);
+                // 模型
+                if (session.getModelName() != null && !session.getModelName().isEmpty()) {
+                    Label modelLabel = new Label(session.getModelName());
+                    modelLabel.setStyle("-fx-font-size:10px;-fx-text-fill:#888;");
+                    info.getChildren().add(modelLabel);
+                }
                 Label time = new Label(session.getCreateTime() != null ? session.getCreateTime().toLocalDate().toString() : "");
                 time.setStyle("-fx-font-size:10px;-fx-text-fill:#999;");
-                info.getChildren().addAll(srcLabel, time);
+                info.getChildren().add(time);
                 // 收藏星标
                 if (favoriteSessionIds.contains(session.getSessionId())) {
                     Label star = new Label("⭐");
@@ -1443,46 +1667,33 @@ public class MainController implements Initializable {
                 }
                 vbox.getChildren().add(info);
 
-                // 内容预览：有搜索词时高亮
+                // 内容预览（截断到80字）
                 String preview = session.getContentPreview();
                 if (preview != null && !preview.isEmpty()) {
-                    if (currentSearchText != null && !currentSearchText.isEmpty()) {
-                        TextFlow previewFlow = buildHighlightedText(
-                            preview.length() > 120 ? preview.substring(0, 120) + "..." : preview,
-                            "-fx-font-size:11px;-fx-text-fill:#666;");
-                        previewFlow.setMaxWidth(280);
-                        vbox.getChildren().add(previewFlow);
-                    } else {
-                        Label previewLabel = new Label(preview.length() > 120 ? preview.substring(0, 120) + "..." : preview);
-                        previewLabel.setStyle("-fx-font-size:11px;-fx-text-fill:#666;");
-                        previewLabel.setWrapText(false);
-                        previewLabel.setMaxWidth(280);
-                        vbox.getChildren().add(previewLabel);
-                    }
-                }
-
-                // 工作目录提示
-                String wd = session.getWorkingDirectory();
-                if (wd != null && !wd.isEmpty()) {
-                    Label path = new Label(shortenPath(wd, 4));
-                    path.setStyle("-fx-font-size:9px;-fx-text-fill:#bbb;");
-                    path.setTooltip(new Tooltip(wd));
-                    vbox.getChildren().add(path);
+                    String shortPreview = preview.length() > 80 ? preview.substring(0, 80) + "…" : preview;
+                    Label previewLabel = new Label(shortPreview);
+                    previewLabel.setStyle("-fx-font-size:11px;-fx-text-fill:#888;");
+                    previewLabel.setWrapText(false);
+                    previewLabel.setMaxWidth(380);
+                    vbox.getChildren().add(previewLabel);
                 }
 
                 setGraphic(vbox);
             }
         }
 
-        private String shortenPath(String path, int levels) {
-            String[] parts = path.replace("\\", "/").split("/");
-            if (parts.length <= levels) return path;
-            StringBuilder sb = new StringBuilder();
-            for (int i = parts.length - levels; i < parts.length; i++) {
-                if (sb.length() > 0) sb.append("/");
-                sb.append(parts[i]);
+        /** 从原始标题提取项目名：去掉 " - uuid.jsonl" 后缀 */
+        private String extractProjectTitle(String raw) {
+            if (raw == null) return "未命名";
+            int lastDash = raw.lastIndexOf(" - ");
+            if (lastDash > 0) {
+                String candidate = raw.substring(lastDash + 3);
+                // 如果是 UUID 格式（含 - 且长度 > 20），取前面的项目名
+                if (candidate.matches("[a-f0-9\\-]{20,}")) {
+                    return raw.substring(0, lastDash);
+                }
             }
-            return "…/" + sb;
+            return raw;
         }
     }
 

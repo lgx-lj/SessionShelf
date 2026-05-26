@@ -223,25 +223,37 @@
 /* 滚动条样式 */
 .scroll-bar {
     -fx-background-color: transparent;
+    -fx-pref-width: 12px;
+    -fx-padding: 0;
 }
-
+.scroll-bar .track {
+    -fx-background-color: transparent;
+}
 .scroll-bar .thumb {
-    -fx-background-color: #cccccc;
-    -fx-background-radius: 3;
+    -fx-background-color: rgba(0,0,0,0.15);
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
 }
-
 .scroll-bar .thumb:hover {
-    -fx-background-color: #999999;
+    -fx-background-color: rgba(0,0,0,0.3);
 }
-
 .scroll-bar .increment-button, .scroll-bar .decrement-button {
     -fx-background-color: transparent;
     -fx-padding: 0;
 }
-
 .scroll-bar .increment-arrow, .scroll-bar .decrement-arrow {
     -fx-shape: " ";
     -fx-padding: 0;
+}
+/* 列表/树形控件内部滚动条 */
+.list-view .scroll-bar:vertical,
+.tree-view .scroll-bar:vertical {
+    -fx-pref-width: 10px;
+}
+.list-view .scroll-bar .thumb,
+.tree-view .scroll-bar .thumb {
+    -fx-background-color: rgba(0,0,0,0.12);
+    -fx-background-radius: 5;
 }
 
 /* 右键菜单 */
