@@ -1,8 +1,42 @@
-# AI 会话管家 - SessionShelf
+# CC SessionShelf
 
-本地离线多源 AI 会话统一管理工具
+## 解决了什么痛点
+
+- 会话数据分散 - 不同项目的会话存储在不同位置和格式
+- 缺乏统一管理 - 无法跨工具搜索和归类会话
+- 数据导出困难 - 会话数据被锁定在各自的工具中
+- 寻找与恢复claude code 历史对话困难
+
+SessionShelf的解决方案：
+- ✅ 快速跳转：关键词查询 ,右键一键 跳转至Claude Code的历史会话
+- ✅ 多源聚合：统一读取 Claude Code的会话数据
+- ✅ 目录管理：多级文件夹树形结构，自定义分类整理
+- ✅ 标签系统：为会话添加标签，快速筛选定位
+- ✅ 全文搜索：跨工具搜索会话标题和内容
+- ✅ 便捷导出：支持 Markdown 和 JSON 格式导出
+- ✅ 本地离线：纯本地运行，数据不外泄
+
+
 ![img.png](img.png)
 ![img_1.png](img_1.png)
+
+## 快速启动
+
+### 方式 1: 双击批处理文件（推荐）
+
+直接双击以下任一文件启动：
+
+- **`启动应用.bat`** - 显示控制台日志，方便调试
+- **`SessionShelf.bat`** - 无控制台窗口，后台静默运行
+
+### 方式 2: 命令行启动
+
+```bash
+cd D:\SoftwareCoding\workspace\LGX\ai\SessionShelf
+export JAVA_HOME="C:\Users\LiGuoXian\.jdks\ms-17.0.16"
+mvn javafx:run
+```
+
 
 ## 功能特性
 
